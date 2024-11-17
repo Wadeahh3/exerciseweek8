@@ -79,6 +79,7 @@ jobs:
       # Set up SSH to connect to the Google Cloud VM
       - name: Set up SSH
         run: |
+          mkdir -p ~/.ssh  # Ensure .ssh directory exists
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ secrets.VM_IP }} >> ~/.ssh/known_hosts
@@ -88,3 +89,4 @@ jobs:
         run: |
           scp -r ./dist/* ${{ secrets.VM_USER }}@${{ secrets.VM_IP }}:/var/www/app
           ssh ${{ secrets.VM_USER }}@${{ secrets.VM_IP }} "cd /var/www/app && npm install && pm2 restart all || pm2 start npm --name 'app' -- start"
+
