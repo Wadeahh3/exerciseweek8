@@ -52,47 +52,58 @@ jobs:
   deploy-to-gcloud:
     needs: deploy-vercel  # Ensures Vercel deployment finishes first
     runs-on: ubuntu-latest
-
+  
     steps:
-      # Checkout the code from the repository
+      # Step 1: Checkout the code from the repository
       - name: Checkout the code
         uses: actions/checkout@v3
-
-      # Set up the Node.js environment
+  
+      # Step 2: Set up the Node.js environment
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'  # The version of Node.js required for your project
-
-      # Install dependencies and build the project
+  
+      # Step 3: Install dependencies and build the project
       - name: Install dependencies
         run: |
-          npm install pnpm -g
-          pnpm install
-          npm run build
-
-      # Authenticate using the Google Cloud Service Account
+          npm install pnpm -g  # Install pnpm globally
+          pnpm install         # Install project dependencies
+          npm run build        # Build the Next.js project
+  
+      # Step 4: Authenticate to Google Cloud
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v1
         with:
           credentials_json: ${{ secrets.GCP_CREDENTIALS }}
-
-      # Set up SSH to connect to the Google Cloud VM
+  
+      # Step 5: Set up SSH to connect to the Google Cloud VM
       - name: Set up SSH
         run: |
-          mkdir -p ~/.ssh  # Ensure .ssh directory exists
+          mkdir -p ~/.ssh  # Ensure the .ssh directory exists
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa  # Set correct permissions for private key
           ssh-keyscan -H ${{ secrets.VM_IP }} >> ~/.ssh/known_hosts  # Add VM IP to known_hosts
-
-      # Debug: Verify SSH key and directory (Optional, useful for debugging)
+  
+      # Step 6: Debug - Verify SSH key and directory
       - name: Verify SSH Setup
         run: |
-          ls -la ~/.ssh
+          ls -la ~/.ssh  # List .ssh directory
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.VM_USER }}@${{ secrets.VM_IP }} "echo Connected to VM successfully!"
-
-      # Deploy the code to the Google Cloud VM
+  
+      # Step 7: Deploy the Next.js build to the Google Cloud VM
       - name: Deploy to Google Cloud VM
         run: |
-          scp -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa -r ./dist/* ${{ secrets.VM_USER }}@${{ secrets.VM_IP }}:/var/www/app
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.VM_USER }}@${{ secrets.VM_IP }} "cd /var/www/app && npm install && pm2 restart all || pm2 start npm --name 'app' -- start"
+          scp -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa -r ./.next/* ${{ secrets.VM_USER }}@${{ secrets.VM_IP }}:/var/www/app  # Copy Next.js build files
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.VM_USER }}@${{ secrets.VM_IP }} "
+            cd /var/www/app &&  # Navigate to deployment directory
+            npm install &&      # Install any runtime dependencies
+            pm2 restart all || pm2 start npm --name 'app' -- start  # Restart or start the app
+          "
+  
+      # Step 8: Debug - Verify deployed files on the VM
+      - name: Verify Deployed Files
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.VM_USER }}@${{ secrets.VM_IP }} "
+            ls -la /var/www/app  # List deployed files on the VM
+          "
