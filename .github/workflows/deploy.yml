@@ -50,6 +50,7 @@ jobs:
 
   # New Google Cloud VM deployment logic
   deploy-to-gcloud:
+    needs: deploy-vercel  # Ensures Vercel deployment finishes first
     runs-on: ubuntu-latest
 
     steps:
@@ -84,11 +85,10 @@ jobs:
           chmod 600 ~/.ssh/id_rsa  # Set correct permissions for private key
           ssh-keyscan -H ${{ secrets.VM_IP }} >> ~/.ssh/known_hosts  # Add VM IP to known_hosts
 
-      # Debug: Verify SSH key and directory
+      # Debug: Verify SSH key and directory (Optional, useful for debugging)
       - name: Verify SSH Setup
         run: |
           ls -la ~/.ssh
-          cat ~/.ssh/id_rsa
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.VM_USER }}@${{ secrets.VM_IP }} "echo Connected to VM successfully!"
 
       # Deploy the code to the Google Cloud VM
