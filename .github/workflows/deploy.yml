@@ -1,4 +1,4 @@
-name: Deploy to Vercel
+name: Deploy to Vercel and Google Cloud VM
 
 on:
   push:
@@ -6,18 +6,22 @@ on:
       - master  # or the branch you want to deploy from
 
 jobs:
-  deploy:
+  # Original Vercel deployment logic
+  deploy-vercel:
     runs-on: ubuntu-latest
 
     steps:
+      # Checkout the code from the repository
       - name: Checkout code
         uses: actions/checkout@v3
 
+      # Set up the Node.js environment
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '23'  # or the version your project uses
 
+      # Install dependencies and build the Next.js project
       - name: Install dependencies
         working-directory: ./  # Path to your Next.js app
         run: |
@@ -25,9 +29,10 @@ jobs:
           pnpm install
 
       - name: Build Next.js
-        working-directory: ./
+        working-directory: ./  # Path to your Next.js app
         run: npm run build
 
+      # Deploy to Vercel
       - name: Deploy to Vercel
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
@@ -35,16 +40,51 @@ jobs:
           npm install -g vercel
           vercel --prod --token $VERCEL_TOKEN --confirm
 
-  deploy-fastapi:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout the code
-        uses: actions/checkout@v3
-
-      # Option 1: Deploy FastAPI as Serverless Functions on Vercel (for lightweight endpoints)
+      # Optional: Deploy FastAPI as serverless functions on Vercel
       - name: Deploy FastAPI as Serverless Functions
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
           npm install -g vercel
           vercel deploy --token $VERCEL_TOKEN --confirm
+
+  # New Google Cloud VM deployment logic
+  deploy-to-gcloud:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout the code from the repository
+      - name: Checkout the code
+        uses: actions/checkout@v3
+
+      # Set up the Node.js environment
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'  # The version of Node.js required for your project
+
+      # Install dependencies and build the project
+      - name: Install dependencies
+        run: |
+          npm install pnpm -g
+          pnpm install
+          npm run build
+
+      # Authenticate using the Google Cloud Service Account
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+
+      # Set up SSH to connect to the Google Cloud VM
+      - name: Set up SSH
+        run: |
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.VM_IP }} >> ~/.ssh/known_hosts
+
+      # Deploy the code to the Google Cloud VM
+      - name: Deploy to Google Cloud VM
+        run: |
+          scp -r ./dist/* ${{ secrets.VM_USER }}@${{ secrets.VM_IP }}:/var/www/app
+          ssh ${{ secrets.VM_USER }}@${{ secrets.VM_IP }} "cd /var/www/app && npm install && pm2 restart all || pm2 start npm --name 'app' -- start"
