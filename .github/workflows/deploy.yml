@@ -81,12 +81,18 @@ jobs:
         run: |
           mkdir -p ~/.ssh  # Ensure .ssh directory exists
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.VM_IP }} >> ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_rsa  # Set correct permissions for private key
+          ssh-keyscan -H ${{ secrets.VM_IP }} >> ~/.ssh/known_hosts  # Add VM IP to known_hosts
+
+      # Debug: Verify SSH key and directory
+      - name: Verify SSH Setup
+        run: |
+          ls -la ~/.ssh
+          cat ~/.ssh/id_rsa
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.VM_USER }}@${{ secrets.VM_IP }} "echo Connected to VM successfully!"
 
       # Deploy the code to the Google Cloud VM
       - name: Deploy to Google Cloud VM
         run: |
-          scp -r ./dist/* ${{ secrets.VM_USER }}@${{ secrets.VM_IP }}:/var/www/app
-          ssh ${{ secrets.VM_USER }}@${{ secrets.VM_IP }} "cd /var/www/app && npm install && pm2 restart all || pm2 start npm --name 'app' -- start"
-
+          scp -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa -r ./dist/* ${{ secrets.VM_USER }}@${{ secrets.VM_IP }}:/var/www/app
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.VM_USER }}@${{ secrets.VM_IP }} "cd /var/www/app && npm install && pm2 restart all || pm2 start npm --name 'app' -- start"
